@@ -22,11 +22,19 @@ func main() {
 	key := flag.Arg(0)
 
 	if isWrite {
-		writeKey(key, db, keyIndices)
+		val := flag.Arg(1)
+		offset := getAppendOffset(db)
+		writeKey(key, val, offset, db)
 	} else {
 		str := ReadKey(key, db, keyIndices)
 		fmt.Print(str)
 	}
+}
+
+func getAppendOffset(db *os.File) int64 {
+	stat, _ := db.Stat()
+	offset := stat.Size()
+	return offset
 }
 
 func ReadKey(key string, db io.Reader, keyIndices map[string]int64) string {
@@ -41,15 +49,13 @@ func ReadKey(key string, db io.Reader, keyIndices map[string]int64) string {
 	return kv
 }
 
-func writeKey(key string, db *os.File, keyIndices map[string]int64) {
-	val := flag.Arg(1)
-	stat, _ := db.Stat()
-	offset := stat.Size()
-	keyIndices[key] = offset + 1
-	_, err := db.WriteString(fmt.Sprintf("%v: %v\n", key, val))
+func writeKey(key string, val string, offset int64, db io.Writer) int64 {
+	_, err := db.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	return offset + 1
 }
 
 func setOpts(isWrite *bool) {

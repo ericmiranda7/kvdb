@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"log"
+	"os"
 	"testing"
 )
 
@@ -18,5 +19,20 @@ func TestReadKey(t *testing.T) {
 
 	if got != expected {
 		log.Fatalf("got %v want %v", got, expected)
+	}
+}
+
+func TestWriteKey(t *testing.T) {
+	os.Args = []string{"a", "42"}
+
+	f := bytes.Buffer{}
+
+	exp := "a: 42\n"
+
+	writeKey("a", "42", 0, &f)
+
+	got, _ := f.ReadString('\n')
+	if got != exp {
+		log.Fatalf("got %v want %v", got, exp)
 	}
 }
