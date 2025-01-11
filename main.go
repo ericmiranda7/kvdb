@@ -15,38 +15,48 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	ind = make(map[string]int64)
 	db, _ := os.OpenFile("./dbfile", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	readDbIndexes("./dbfile")
 
-	put := flag.Bool("w", false, "Write k, v")
-	flag.Parse()
+	var isWrite bool
+	setOpts(&isWrite)
 
 	key := flag.Arg(0)
 
-	readInd("./dbfile")
-
-	if *put {
-		// write
-		val := flag.Arg(1)
-		stat, _ := db.Stat()
-		offset := stat.Size()
-		ind[key] = offset + 1
-		_, err := db.WriteString(fmt.Sprintf("%v: %v\n", key, val))
-		if err != nil {
-			log.Fatal(err)
-		}
+	if isWrite {
+		writeKey(key, db)
 	} else {
-		// read
-		offset := ind[key]
-		reader := bufio.NewReader(db)
-		_, err := reader.Discard(int(offset))
-		if err != nil {
-			log.Fatal(err)
-		}
-		kv, _ := reader.ReadString('\n')
-		fmt.Print(kv)
+		readKey(key, db)
 	}
 }
 
-func readInd(path string) {
+func readKey(key string, db *os.File) {
+	offset := ind[key]
+	reader := bufio.NewReader(db)
+	_, err := reader.Discard(int(offset))
+	if err != nil {
+		log.Fatal(err)
+	}
+	kv, _ := reader.ReadString('\n')
+	fmt.Print(kv)
+}
+
+func writeKey(key string, db *os.File) {
+	val := flag.Arg(1)
+	stat, _ := db.Stat()
+	offset := stat.Size()
+	ind[key] = offset + 1
+	_, err := db.WriteString(fmt.Sprintf("%v: %v\n", key, val))
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func setOpts(isWrite *bool) {
+	flag.BoolVar(isWrite, "w", false, "Write k, v")
+	flag.Parse()
+}
+
+func readDbIndexes(path string) {
 	f, _ := os.Open(path)
 	reader := bufio.NewReader(f)
 	var offset int64
