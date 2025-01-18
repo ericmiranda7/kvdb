@@ -13,21 +13,36 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	keyIndices := make(map[string]int64)
-	db, _ := os.OpenFile("./dbfile", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	readDbIndexes(bufio.NewReader(db), keyIndices)
+	writeDb, _ := os.OpenFile("./dbfile", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	readDb, _ := os.OpenFile("./dbfile", os.O_RDONLY, 0644)
+
+	readDbIndexes(readDb, keyIndices)
 
 	var isWrite bool
-	setOpts(&isWrite)
+	var isStdin bool
+	setOpts(&isWrite, &isStdin)
 
-	key := flag.Arg(0)
+	sc := bufio.NewScanner(os.Stdin)
 
-	if isWrite {
-		val := flag.Arg(1)
-		offset := getAppendOffset(db)
-		writeKey(key, val, offset, db)
-	} else {
-		str := readKey(key, db, keyIndices)
-		fmt.Print(str)
+	for sc.Scan() {
+		s := strings.Split(sc.Text(), " ")
+		op := s[0]
+		key := s[1]
+
+		switch op {
+		case "w":
+			{
+				val := s[2]
+				keyIndices[key] = getAppendOffset(writeDb)
+				writeKey(key, val, keyIndices[key], writeDb)
+			}
+		case "r":
+			{
+				println("reading")
+				str := readKey(key, readDb, keyIndices)
+				fmt.Print(str)
+			}
+		}
 	}
 }
 
@@ -46,31 +61,30 @@ func readKey(key string, db io.Reader, keyIndices map[string]int64) string {
 	}
 
 	kv, _ := reader.ReadString('\n')
+	db.(*os.File).Seek(0, 0)
 	return kv
 }
 
-func writeKey(key string, val string, offset int64, db io.Writer) int64 {
+func writeKey(key string, val string, offset int64, db io.Writer) {
 	_, err := db.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return offset + 1
 }
 
-func setOpts(isWrite *bool) {
+func setOpts(isWrite *bool, isStdin *bool) {
 	flag.BoolVar(isWrite, "w", false, "Write k, v")
+	flag.BoolVar(isStdin, "i", false, "Interactive mode")
 	flag.Parse()
 }
 
-func readDbIndexes(db *bufio.Reader, keyIndices map[string]int64) {
+func readDbIndexes(db io.Reader, keyIndices map[string]int64) {
 	var offset int
+	reader := bufio.NewReader(db)
 
 	for {
-		b, err := db.ReadBytes('\n')
-		log.Println(offset)
+		b, err := reader.ReadBytes('\n')
 		if err != nil {
-			log.Println(offset, err)
 			break
 		}
 
@@ -78,6 +92,7 @@ func readDbIndexes(db *bufio.Reader, keyIndices map[string]int64) {
 		keyIndices[key] = int64(offset)
 
 		offset += len(b)
-
 	}
+	fmt.Println("offsets: ", keyIndices)
+	_, _ = db.(*os.File).Seek(0, 0)
 }
