@@ -13,17 +13,20 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	keyIndices := make(map[string]int64)
-	writeDb, _ := os.OpenFile("./dbfile", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	readDb, _ := os.OpenFile("./dbfile", os.O_RDONLY, 0644)
+	db, _ := os.OpenFile("./dbfile", os.O_RDWR|os.O_CREATE, 0644)
+	defer func(db *os.File) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(db)
 
-	readDbIndexes(readDb, keyIndices)
+	readDbIndexes(db, keyIndices)
 
-	var isWrite bool
 	var isStdin bool
-	setOpts(&isWrite, &isStdin)
+	setOpts(&isStdin)
 
 	sc := bufio.NewScanner(os.Stdin)
-
 	for sc.Scan() {
 		s := strings.Split(sc.Text(), " ")
 		op := s[0]
@@ -33,13 +36,13 @@ func main() {
 		case "w":
 			{
 				val := s[2]
-				keyIndices[key] = getAppendOffset(writeDb)
-				writeKey(key, val, keyIndices[key], writeDb)
+				keyIndices[key] = getAppendOffset(db)
+				writeKey(key, val, db)
 			}
 		case "r":
 			{
 				println("reading")
-				str := readKey(key, readDb, keyIndices)
+				str := readKey(key, db, keyIndices)
 				fmt.Print(str)
 			}
 		}
@@ -61,19 +64,18 @@ func readKey(key string, db io.Reader, keyIndices map[string]int64) string {
 	}
 
 	kv, _ := reader.ReadString('\n')
-	db.(*os.File).Seek(0, 0)
 	return kv
 }
 
-func writeKey(key string, val string, offset int64, db io.Writer) {
+func writeKey(key string, val string, db io.Writer) {
+
 	_, err := db.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func setOpts(isWrite *bool, isStdin *bool) {
-	flag.BoolVar(isWrite, "w", false, "Write k, v")
+func setOpts(isStdin *bool) {
 	flag.BoolVar(isStdin, "i", false, "Interactive mode")
 	flag.Parse()
 }
