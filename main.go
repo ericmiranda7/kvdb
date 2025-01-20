@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
+	"github.com/ericmiranda7/kvdb/v2/src/database"
 	"log"
 	"os"
 	"strings"
@@ -12,16 +12,9 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	keyIndices := make(map[string]int64)
-	db, _ := os.OpenFile("./dbfile", os.O_RDWR|os.O_CREATE, 0644)
-	defer func(db *os.File) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(db)
+	db := database.NewDb("../dbfile")
 
-	readDbIndexes(db, keyIndices)
+	db.ReadDbIndexes()
 
 	var isStdin bool
 	setOpts(&isStdin)
@@ -36,65 +29,18 @@ func main() {
 		case "w":
 			{
 				val := s[2]
-				keyIndices[key] = getAppendOffset(db)
-				writeKey(key, val, db)
+				db.WriteKey(key, val)
 			}
 		case "r":
 			{
-				println("reading")
-				str := readKey(key, db, keyIndices)
+				str := db.ReadKey(key)
 				fmt.Print(str)
 			}
 		}
 	}
 }
 
-func getAppendOffset(db *os.File) int64 {
-	stat, _ := db.Stat()
-	offset := stat.Size()
-	return offset
-}
-
-func readKey(key string, db io.Reader, keyIndices map[string]int64) string {
-	offset := keyIndices[key]
-	reader := bufio.NewReader(db)
-	_, err := reader.Discard(int(offset))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	kv, _ := reader.ReadString('\n')
-	return kv
-}
-
-func writeKey(key string, val string, db io.Writer) {
-
-	_, err := db.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func setOpts(isStdin *bool) {
 	flag.BoolVar(isStdin, "i", false, "Interactive mode")
 	flag.Parse()
-}
-
-func readDbIndexes(db io.Reader, keyIndices map[string]int64) {
-	var offset int
-	reader := bufio.NewReader(db)
-
-	for {
-		b, err := reader.ReadBytes('\n')
-		if err != nil {
-			break
-		}
-
-		key := strings.Split(string(b), ": ")[0]
-		keyIndices[key] = int64(offset)
-
-		offset += len(b)
-	}
-	fmt.Println("offsets: ", keyIndices)
-	_, _ = db.(*os.File).Seek(0, 0)
 }
