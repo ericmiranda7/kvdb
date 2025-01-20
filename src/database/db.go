@@ -10,15 +10,15 @@ import (
 )
 
 type Db struct {
-	store      *os.File
-	keyIndices map[string]int64
+	store    io.ReadWriteSeeker
+	keyIndex map[string]int64
 }
 
-func NewDb(path string) Db {
-	f, _ := os.OpenFile("./dbfile", os.O_RDWR|os.O_CREATE, 0644)
+func NewDb(path string, keyIndex map[string]int64) Db {
+	f, _ := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	return Db{
-		store:      f,
-		keyIndices: make(map[string]int64),
+		store:    f,
+		keyIndex: keyIndex,
 	}
 }
 
@@ -34,20 +34,20 @@ func (d Db) ReadDbIndexes() {
 			break
 		}
 		key := strings.Split(string(line), ": ")[0]
-		d.keyIndices[key] = int64(offset)
+		d.keyIndex[key] = int64(offset)
 
 		offset += len(line)
 	}
-	fmt.Println("offsets: ", d.keyIndices)
+	fmt.Println("offsets: ", d.keyIndex)
 }
 
 func (d Db) WriteKey(key string, val string) {
-	seek, err := d.store.Seek(2, 0)
-	d.keyIndices[key] = seek
-
+	seek, err := d.store.Seek(0, 2)
 	if err != nil {
 		log.Fatal(err)
 	}
+	d.keyIndex[key] = seek
+
 	_, err = d.store.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
 	if err != nil {
 		log.Fatal(err)
@@ -55,7 +55,7 @@ func (d Db) WriteKey(key string, val string) {
 }
 
 func (d Db) ReadKey(key string) string {
-	_, err := d.store.Seek(d.keyIndices[key], 0)
+	_, err := d.store.Seek(d.keyIndex[key], 0)
 	if err != nil {
 		log.Fatal(err)
 	}

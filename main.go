@@ -12,7 +12,7 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	db := database.NewDb("../dbfile")
+	db := database.NewDb("../dbfile", make(map[string]int64))
 
 	db.ReadDbIndexes()
 
