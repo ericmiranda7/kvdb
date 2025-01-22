@@ -59,8 +59,11 @@ func (d Db) ReadKey(key string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	reader := bufio.NewReader(d.store)
 
 	kv, _ := reader.ReadString('\n')
-	return kv
+	log.Println("kv", kv)
+	value := strings.TrimSpace(strings.Split(kv, ":")[1][1:])
+	return value
 }
