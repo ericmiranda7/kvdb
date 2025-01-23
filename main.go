@@ -2,45 +2,41 @@ package main
 
 import (
 	"bufio"
-	"flag"
-	"fmt"
 	"github.com/ericmiranda7/kvdb/v2/src/database"
 	"log"
-	"os"
+	"net/http"
 	"strings"
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	db := database.NewDb("../dbfile", make(map[string]int64))
+	db := database.NewDb("./dbfile", make(map[string]int64))
 
 	db.ReadDbIndexes()
 
-	var isStdin bool
-	setOpts(&isStdin)
-
-	sc := bufio.NewScanner(os.Stdin)
-	for sc.Scan() {
-		s := strings.Split(sc.Text(), " ")
-		op := s[0]
-		key := s[1]
-
-		switch op {
-		case "w":
-			{
-				val := s[2]
-				db.WriteKey(key, val)
-			}
-		case "r":
-			{
-				str := db.ReadKey(key)
-				fmt.Print(str)
-			}
-		}
+	smux := http.DefaultServeMux
+	s := http.Server{
+		Addr:    "localhost:8081",
+		Handler: smux,
 	}
-}
+	smux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
+		sc := bufio.NewScanner(r.Body)
+		sc.Scan()
+		kv := sc.Text()
+		key := strings.Split(kv, ": ")[0]
+		val := strings.Split(kv, ": ")[1]
+		db.WriteKey(key, val)
+		w.WriteHeader(http.StatusOK)
+	})
+	smux.HandleFunc("GET /{key}", func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("key")
+		println(key)
+		value := db.ReadKey(key)
+		w.Write([]byte(value))
+	})
 
-func setOpts(isStdin *bool) {
-	flag.BoolVar(isStdin, "i", false, "Interactive mode")
-	flag.Parse()
+	err := s.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

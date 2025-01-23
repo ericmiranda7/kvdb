@@ -36,7 +36,7 @@ func (d Db) ReadDbIndexes() {
 		key := strings.Split(string(line), ": ")[0]
 		d.keyIndex[key] = int64(offset)
 
-		offset += len(line)
+		offset += len(line) + 1
 	}
 	fmt.Println("offsets: ", d.keyIndex)
 }
@@ -46,7 +46,7 @@ func (d Db) WriteKey(key string, val string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	d.keyIndex[key] = seek
+	d.keyIndex[key] = seek + 1
 
 	_, err = d.store.Write([]byte(fmt.Sprintf("%v: %v\n", key, val)))
 	if err != nil {
@@ -63,7 +63,6 @@ func (d Db) ReadKey(key string) string {
 	reader := bufio.NewReader(d.store)
 
 	kv, _ := reader.ReadString('\n')
-	log.Println("kv", kv)
 	value := strings.TrimSpace(strings.Split(kv, ":")[1][1:])
 	return value
 }
