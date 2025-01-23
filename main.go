@@ -19,7 +19,26 @@ func main() {
 		Addr:    "localhost:8081",
 		Handler: smux,
 	}
-	smux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
+	smux.HandleFunc("POST /", writeHandler(db))
+	smux.HandleFunc("GET /{key}", readHandler(db))
+
+	err := s.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func readHandler(db database.Db) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("key")
+		println(key)
+		value := db.ReadKey(key)
+		w.Write([]byte(value))
+	}
+}
+
+func writeHandler(db database.Db) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		sc := bufio.NewScanner(r.Body)
 		sc.Scan()
 		kv := sc.Text()
@@ -27,16 +46,5 @@ func main() {
 		val := strings.Split(kv, ": ")[1]
 		db.WriteKey(key, val)
 		w.WriteHeader(http.StatusOK)
-	})
-	smux.HandleFunc("GET /{key}", func(w http.ResponseWriter, r *http.Request) {
-		key := r.PathValue("key")
-		println(key)
-		value := db.ReadKey(key)
-		w.Write([]byte(value))
-	})
-
-	err := s.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
 	}
 }
